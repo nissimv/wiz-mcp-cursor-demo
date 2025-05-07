@@ -1,0 +1,20 @@
+Resources:
+  InsecureIAMRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: "InsecureRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: "ec2.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "AllowAll"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action: "*"
+                Resource: "*"

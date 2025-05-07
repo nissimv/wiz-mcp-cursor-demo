@@ -1,0 +1,9 @@
+- name: Insecure playbook
+  hosts: all
+  tasks:
+    - name: Install Apache
+      apt:
+        name: apache2
+        state: present
+    - name: Use plaintext password
+      shell: echo "root:password123" | chpasswd
