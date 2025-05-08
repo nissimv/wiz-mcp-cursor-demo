@@ -1,0 +1,171 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Amazon EKS Cluster with VPC and Node Group'
+
+Resources:
+  # VPC
+  EKSClusterVPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: '10.0.0.0/16'
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: eks-cluster-vpc
+
+  # Internet Gateway
+  InternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties:
+      Tags:
+        - Key: Name
+          Value: eks-cluster-igw
+
+  AttachGateway:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref EKSClusterVPC
+      InternetGatewayId: !Ref InternetGateway
+
+  # Public Subnets
+  PublicSubnet1:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref EKSClusterVPC
+      CidrBlock: '10.0.1.0/24'
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: eks-cluster-public-subnet-1
+
+  PublicSubnet2:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref EKSClusterVPC
+      CidrBlock: '10.0.2.0/24'
+      AvailabilityZone: !Select [1, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: eks-cluster-public-subnet-2
+
+  # Route Table
+  PublicRouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref EKSClusterVPC
+      Tags:
+        - Key: Name
+          Value: eks-cluster-public-route-table
+
+  PublicRoute:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnet2RouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+  # EKS Cluster
+  EKSClusterRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: eks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+        - arn:aws:iam::aws:policy/AmazonEKSServicePolicy
+        - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+      Tags:
+        - Key: Name
+          Value: eks-cluster-role
+
+  EKSCluster:
+    Type: 'AWS::EKS::Cluster'
+    Properties:
+      Name: my-eks-cluster
+      ResourcesVpcConfig:
+        SubnetIds:
+          - !Ref PublicSubnet1
+          - !Ref PublicSubnet2
+      RoleArn: !GetAtt EKSClusterRole.Arn
+
+  # Node Group
+  EKSNodeGroupRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+        - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+      Tags:
+        - Key: Name
+          Value: eks-nodegroup-role
+
+  EKSNodeGroupInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Roles:
+        - Ref: EKSNodeGroupRole
+
+  EKSNodeGroup:
+    Type: 'AWS::EKS::Nodegroup'
+    Properties:
+      ClusterName: !Ref EKSCluster
+      NodegroupName: eks-node-group
+      NodeRole: !GetAtt EKSNodeGroupRole.Arn
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      ScalingConfig:
+        DesiredSize: 2
+        MinSize: 1
+        MaxSize: 3
+      InstanceTypes:
+        - t3.medium
+      AmiType: AL2_x86_64
+
+Outputs:
+  ClusterName:
+    Description: 'Name of the EKS Cluster'
+    Value: !Ref EKSCluster
+
+  ClusterEndpoint:
+    Description: 'Endpoint for the EKS Cluster'
+    Value: !GetAtt EKSCluster.Endpoint
+
+  VPCId:
+    Description: 'VPC Id for the EKS Cluster'
+    Value: !Ref EKSClusterVPC
+
+  SubnetIds:
+    Description: 'Subnets Ids for the EKS Cluster'
+    Value: !Join [',', [!Ref PublicSubnet1, !Ref PublicSubnet2]]
+
+  NodeInstanceRole:
+    Description: 'Role ARN for the EKS node group'
+    Value: !GetAtt EKSNodeGroupRole.Arn

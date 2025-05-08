@@ -1,0 +1,33 @@
+By default a block public access is created for S3 Bucket
+
+- Edit Block public access (bucket settings) and uncheck the 'Block all public access' 
+- save changes 
+
+- edit Bucket policy and add the below json configuration to allow all to read = "s3:GetObject" upload "s3:PutObject" making it public.
+
+
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::my-free-tier-s3-bucket/*"
+    }
+    ,
+    {
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::my-free-tier-s3-bucket/*"
+    }
+  ]
+}
+
+Verify bucket is buplic by uploading sample file to the bucket and trying to downlaod the file using the object file url 
+https://my-free-tier-s3-bucket.s3.amazonaws.com/test+file+upload.xlsx
+
+Test succeeded (screen shoot)
+
+This allows exposure of sensitive
