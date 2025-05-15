@@ -1,0 +1,14 @@
+# Ignore Terraform state files and directories
+*.tfstate
+*.tfstate.backup
+.terraform/
+
+# Ignore local environment files
+.env
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db
+
+# Ignore zip file
+/drive-download-20250508T123857Z-001.zip 
