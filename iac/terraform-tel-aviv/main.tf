@@ -1,3 +1,11 @@
+terraform {
+  backend "s3" {
+    bucket = "tel-aviv-tfstate-bucket-main-office"
+    key    = "terraform/state/s3-upload-bucket.tfstate"
+    region = "us-west-2"
+  }
+}
+
 provider "aws" {
   region = "us-west-2"
 }
@@ -48,14 +56,21 @@ resource "aws_route_table_association" "tel_aviv_public_assoc" {
 
 resource "aws_security_group" "tel_aviv_ssh_sg" {
   name        = "tel-aviv-ssh-sg"
-  description = "Allow SSH access"
+  description = "Allow all inbound and outbound traffic (vulnerable)"
   vpc_id      = aws_vpc.tel_aviv_vpc.id
 
   ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    self        = true
   }
 
   egress {
@@ -103,6 +118,12 @@ resource "aws_instance" "tel_aviv_ec2_1" {
   vpc_security_group_ids = [aws_security_group.tel_aviv_ssh_sg.id]
   associate_public_ip_address = true
   iam_instance_profile   = aws_iam_instance_profile.tel_aviv_instance_profile.name
+  user_data = <<-EOF
+    #!/bin/bash
+    echo 'DB_PASSWORD=SuperSecretPassword123!' > /tmp/secret.txt
+    echo 'AWS_ACCESS_KEY_ID=AKIAEXAMPLE' >> /tmp/secret.txt
+    echo 'AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY' >> /tmp/secret.txt
+  EOF
   tags = {
     Name = "tel-aviv-ec2-1"
   }
@@ -115,6 +136,12 @@ resource "aws_instance" "tel_aviv_ec2_2" {
   vpc_security_group_ids = [aws_security_group.tel_aviv_ssh_sg.id]
   associate_public_ip_address = true
   iam_instance_profile   = aws_iam_instance_profile.tel_aviv_instance_profile.name
+  user_data = <<-EOF
+    #!/bin/bash
+    echo 'DB_PASSWORD=SuperSecretPassword123!' > /tmp/secret.txt
+    echo 'AWS_ACCESS_KEY_ID=AKIAEXAMPLE' >> /tmp/secret.txt
+    echo 'AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY' >> /tmp/secret.txt
+  EOF
   tags = {
     Name = "tel-aviv-ec2-2"
   }
@@ -127,6 +154,39 @@ resource "aws_s3_bucket" "tel_aviv_bucket" {
 
 resource "random_id" "suffix" {
   byte_length = 4
+}
+
+resource "aws_iam_user" "vulnerable_service_account" {
+  name = "vulnerable-service-account"
+  force_destroy = true
+}
+
+resource "aws_iam_user_policy" "vulnerable_service_account_policy" {
+  name = "vulnerable-service-account-policy"
+  user = aws_iam_user.vulnerable_service_account.name
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = ["s3:*", "ec2:*"]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_access_key" "vulnerable_service_account_key" {
+  user = aws_iam_user.vulnerable_service_account.name
+}
+
+output "vulnerable_service_account_access_key_id" {
+  value = aws_iam_access_key.vulnerable_service_account_key.id
+}
+
+output "vulnerable_service_account_secret_access_key" {
+  value     = aws_iam_access_key.vulnerable_service_account_key.secret
+  sensitive = true
 }
 
 output "tel_aviv_ec2_1_id" {
