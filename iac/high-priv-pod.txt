@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: high-priv-pod
+spec:
+  containers:
+  - name: web_services
+    image: 971422719869.dkr.ecr.us-east-1.amazonaws.com/web_services:latest
+    securityContext:
+      privileged: true
