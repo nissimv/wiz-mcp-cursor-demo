@@ -1,0 +1,21 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# ECR Public Write Policy Risk
+
+The file [iac/ecr-policy.json](mdc:iac/ecr-policy.json) defines an AWS ECR repository policy that allows public write access:
+
+- It grants `ecr:PutImage` and related actions to `"Principal": "*"`, meaning anyone can push or overwrite images in the repository.
+- This is a critical security risk and matches the Wiz issue: "ECR repository allows image overwrite by allusers group".
+
+## Impact
+- Anyone can upload or overwrite container images in the affected ECR repository, potentially leading to supply chain attacks.
+- This violates AWS security best practices for container registries.
+
+## Best Practices
+- Never use `"Principal": "*"` for write actions on ECR repositories.
+- Restrict `ecr:PutImage` and similar actions to trusted AWS accounts or roles only.
+- Regularly audit ECR repository policies for public or overly permissive access.
+
